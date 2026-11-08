@@ -1,22 +1,34 @@
 package inventario.estructuras;
 
 import inventario.modelo.Producto;
+import inventario.util.Formato;
 
 import java.time.LocalDate;
 
-
+/**
+ * Nuestra lista enlazada simple de productos.
+ * <p>
+ * En el avance 1 esta era la estructura principal del programa. En el
+ * avance 2 cada cliente tiene una de estas listas como su carrito, y el
+ * árbol del inventario también la usa para devolver sus productos en orden.
+ * <p>
+ * Además de la cabeza guardamos una referencia a la cola (el último nodo).
+ * Así, para insertar al final no hay que recorrer toda la lista. También
+ * llevamos el tamaño en una variable para no tener que contar los nodos
+ * cada vez que se necesita.
+ */
 public class ListaProductos {
 
-    /** Primer nodo de la lista ({@code null} si la lista está vacía). */
+    /** Primer nodo de la lista. Si la lista está vacía es null. */
     private NodoProducto cabeza;
 
-    /** Último nodo de la lista ({@code null} si la lista está vacía). */
+    /** Último nodo de la lista. Si la lista está vacía es null. */
     private NodoProducto cola;
 
-    /** Cantidad de nodos (productos) que contiene la lista. */
+    /** Cuántos productos hay en la lista. */
     private int tamanio;
 
-    /** Crea una lista de productos vacía. */
+    /** Crea una lista vacía. */
     public ListaProductos() {
         this.cabeza = null;
         this.cola = null;
@@ -24,61 +36,62 @@ public class ListaProductos {
     }
 
     // Consultas básicas
-    
 
     /**
-     * @return {@code true} si la lista no contiene productos. Complejidad O(1).
+     * @return true si la lista no tiene productos
      */
     public boolean estaVacia() {
         return cabeza == null;
     }
 
     /**
-     * @return cantidad de productos en la lista. Complejidad O(1).
+     * @return la cantidad de productos que hay en la lista
      */
     public int getTamanio() {
         return tamanio;
     }
 
     /**
-     * @return el primer producto de la lista, o {@code null} si está vacía
+     * @return el primer producto, o null si la lista está vacía
      */
     public Producto getPrimero() {
         return estaVacia() ? null : cabeza.getProducto();
     }
 
     /**
-     * @return el último producto de la lista, o {@code null} si está vacía
+     * @return el último producto, o null si la lista está vacía
      */
     public Producto getUltimo() {
         return estaVacia() ? null : cola.getProducto();
     }
 
     // Inserción
-    
+
     /**
-     * Inserta un producto al inicio de la lista. Complejidad O(n) por la
-     * verificación de duplicados; el enlace en sí es O(1).
+     * Inserta un producto al inicio. El nodo nuevo apunta a la cabeza vieja
+     * y pasa a ser la nueva cabeza. Enlazarlo es O(1), pero antes revisamos
+     * que el nombre no esté repetido y eso sí obliga a recorrer la lista.
      *
-     * @param producto producto que se desea insertar
-     * @throws IllegalArgumentException si el producto es nulo o su nombre ya existe en la lista
+     * @param producto producto que se quiere insertar
+     * @throws IllegalArgumentException si el producto es null o ya hay uno con ese nombre
      */
     public void insertarAlInicio(Producto producto) {
         validarProductoNuevo(producto);
         NodoProducto nuevo = new NodoProducto(producto, cabeza);
         cabeza = nuevo;
-        if (cola == null) {          // la lista estaba vacía
+        if (cola == null) {          // si la lista estaba vacía, el nuevo también es el último
             cola = nuevo;
         }
         tamanio++;
     }
 
     /**
-     * Inserta un producto al final de la lista. Gracias a la referencia
-     * {@code cola}, el enlace es O(1) (la verificación de duplicados es O(n)).
+     * Inserta un producto al final. Como tenemos la referencia a la cola,
+     * solo hay que enganchar el nodo nuevo después de ella, sin recorrer la
+     * lista (aparte de la revisión de nombres repetidos).
      *
-     * @param producto producto que se desea insertar
-     * @throws IllegalArgumentException si el producto es nulo o su nombre ya existe en la lista
+     * @param producto producto que se quiere insertar
+     * @throws IllegalArgumentException si el producto es null o ya hay uno con ese nombre
      */
     public void insertarAlFinal(Producto producto) {
         validarProductoNuevo(producto);
@@ -92,6 +105,17 @@ public class ListaProductos {
         tamanio++;
     }
 
+    /**
+     * Inserta un producto en una posición específica (la 0 es el inicio).
+     * Si la posición es 0 o es el final, reutilizamos los otros dos métodos.
+     * Si es en medio, buscamos el nodo anterior y metemos el nuevo entre ese
+     * nodo y el que le seguía.
+     *
+     * @param posicion posición donde va a quedar el producto, de 0 al tamaño
+     * @param producto producto que se quiere insertar
+     * @throws IndexOutOfBoundsException si la posición no existe
+     * @throws IllegalArgumentException  si el producto es null o ya hay uno con ese nombre
+     */
     public void insertarEnPosicion(int posicion, Producto producto) {
         if (posicion < 0 || posicion > tamanio) {
             throw new IndexOutOfBoundsException(
@@ -110,16 +134,53 @@ public class ListaProductos {
     }
 
     // Búsqueda
-    
+
+    /**
+     * Busca un producto por su nombre, recorriendo la lista desde la cabeza.
+     *
+     * @param nombre nombre del producto (no importan las mayúsculas)
+     * @return el producto, o null si no está
+     */
     public Producto buscar(String nombre) {
         NodoProducto nodo = buscarNodo(nombre);
         return nodo == null ? null : nodo.getProducto();
     }
 
+    /**
+     * @param nombre nombre del producto
+     * @return true si hay un producto con ese nombre en la lista
+     */
     public boolean existe(String nombre) {
         return buscarNodo(nombre) != null;
     }
 
+    /**
+     * Busca todos los productos cuyo nombre contiene un texto. Por ejemplo,
+     * con "mouse" encuentra "Mouse inalámbrico Logitech". Tiene que revisar
+     * todos los nodos, así que es O(n).
+     *
+     * @param texto pedazo del nombre que se busca
+     * @return una lista nueva con lo que coincidió (puede quedar vacía)
+     */
+    public ListaProductos buscarCoincidencias(String texto) {
+        ListaProductos coincidencias = new ListaProductos();
+        if (texto == null || texto.isBlank()) {
+            return coincidencias;
+        }
+        for (NodoProducto actual = cabeza; actual != null; actual = actual.getSiguiente()) {
+            if (actual.getProducto().contieneEnNombre(texto)) {
+                coincidencias.insertarAlFinal(actual.getProducto());
+            }
+        }
+        return coincidencias;
+    }
+
+    /**
+     * Dice en qué posición está un producto.
+     *
+     * @param nombre nombre del producto
+     * @return la posición (empieza en 0), o -1 si no está
+     */
     public int indiceDe(String nombre) {
         int indice = 0;
         for (NodoProducto actual = cabeza; actual != null; actual = actual.getSiguiente()) {
@@ -131,6 +192,13 @@ public class ListaProductos {
         return -1;
     }
 
+    /**
+     * Devuelve el producto que está en una posición.
+     *
+     * @param posicion posición del producto (empieza en 0)
+     * @return el producto de esa posición
+     * @throws IndexOutOfBoundsException si la posición no existe
+     */
     public Producto obtener(int posicion) {
         if (posicion < 0 || posicion >= tamanio) {
             throw new IndexOutOfBoundsException(
@@ -139,9 +207,18 @@ public class ListaProductos {
         return obtenerNodo(posicion).getProducto();
     }
 
-    
-    // Modificación
-    
+    // Modificación (todos devuelven false si el producto no está en la lista)
+
+    /**
+     * Le cambia el nombre a un producto. Antes revisamos que el nombre nuevo
+     * no lo tenga otro producto, porque el nombre funciona como identificador.
+     * Sí dejamos cambiarlo por el mismo nombre con otras mayúsculas.
+     *
+     * @param nombreActual nombre que tiene ahora
+     * @param nuevoNombre  nombre que va a tener
+     * @return true si se cambió
+     * @throws IllegalArgumentException si otro producto ya tiene el nombre nuevo
+     */
     public boolean modificarNombre(String nombreActual, String nuevoNombre) {
         Producto producto = buscar(nombreActual);
         if (producto == null) {
@@ -155,6 +232,11 @@ public class ListaProductos {
         return true;
     }
 
+    /**
+     * @param nombre      nombre del producto
+     * @param nuevoPrecio precio nuevo
+     * @return true si se cambió
+     */
     public boolean modificarPrecio(String nombre, double nuevoPrecio) {
         Producto producto = buscar(nombre);
         if (producto == null) {
@@ -164,6 +246,11 @@ public class ListaProductos {
         return true;
     }
 
+    /**
+     * @param nombre         nombre del producto
+     * @param nuevaCategoria categoría nueva
+     * @return true si se cambió
+     */
     public boolean modificarCategoria(String nombre, String nuevaCategoria) {
         Producto producto = buscar(nombre);
         if (producto == null) {
@@ -173,6 +260,11 @@ public class ListaProductos {
         return true;
     }
 
+    /**
+     * @param nombre     nombre del producto
+     * @param nuevaFecha fecha nueva, o null para indicar que no se vence
+     * @return true si se cambió
+     */
     public boolean modificarFechaVencimiento(String nombre, LocalDate nuevaFecha) {
         Producto producto = buscar(nombre);
         if (producto == null) {
@@ -182,6 +274,11 @@ public class ListaProductos {
         return true;
     }
 
+    /**
+     * @param nombre        nombre del producto
+     * @param nuevaCantidad cantidad nueva
+     * @return true si se cambió
+     */
     public boolean modificarCantidad(String nombre, int nuevaCantidad) {
         Producto producto = buscar(nombre);
         if (producto == null) {
@@ -191,49 +288,67 @@ public class ListaProductos {
         return true;
     }
 
+    /**
+     * @param nombre     nombre del producto
+     * @param rutaImagen imagen que se le agrega
+     * @return true si se agregó (false si no existe el producto o ya tenía esa imagen)
+     */
     public boolean agregarImagen(String nombre, String rutaImagen) {
         Producto producto = buscar(nombre);
         return producto != null && producto.agregarImagen(rutaImagen);
     }
 
+    /**
+     * @param nombre     nombre del producto
+     * @param rutaImagen imagen que se le quita
+     * @return true si se quitó
+     */
     public boolean eliminarImagen(String nombre, String rutaImagen) {
         Producto producto = buscar(nombre);
         return producto != null && producto.eliminarImagen(rutaImagen);
     }
 
-   
     // Eliminación
-    
+
+    /**
+     * Elimina un producto por su nombre. Mientras recorremos vamos guardando
+     * el nodo anterior, porque en una lista simple no hay forma de volver
+     * atrás y lo necesitamos para "saltarnos" el nodo que se va.
+     *
+     * @param nombre nombre del producto
+     * @return el producto que se eliminó, o null si no estaba
+     */
     public Producto eliminar(String nombre) {
         NodoProducto anterior = null;
         NodoProducto actual = cabeza;
 
-        // Recorrer la lista conservando la referencia al nodo anterior
+        // Avanzamos hasta encontrar el producto, siempre con el anterior a mano
         while (actual != null && !actual.getProducto().tieneNombre(nombre)) {
             anterior = actual;
             actual = actual.getSiguiente();
         }
         if (actual == null) {
-            return null;                                   // no se encontró
+            return null;                                   // llegamos al final y no estaba
         }
 
         if (anterior == null) {
-            cabeza = actual.getSiguiente();                // se elimina la cabeza
+            cabeza = actual.getSiguiente();                // era la cabeza, la cabeza pasa al siguiente
         } else {
-            anterior.setSiguiente(actual.getSiguiente());  // se "salta" el nodo
+            anterior.setSiguiente(actual.getSiguiente());  // el anterior ahora apunta al que sigue
         }
         if (actual == cola) {
-            cola = anterior;                               // se eliminó el último
+            cola = anterior;                               // si era el último, el anterior pasa a ser la cola
         }
-        actual.setSiguiente(null);                         // desenlazar el nodo eliminado
+        actual.setSiguiente(null);                         // soltamos el nodo eliminado
         tamanio--;
         return actual.getProducto();
     }
 
     /**
-     * Elimina el primer producto de la lista. Complejidad O(1).
+     * Elimina el primer producto. Es rápido porque el producto está justo
+     * en la cabeza.
      *
-     * @return el producto eliminado, o {@code null} si la lista estaba vacía
+     * @return el producto eliminado, o null si la lista estaba vacía
      */
     public Producto eliminarAlInicio() {
         if (estaVacia()) {
@@ -242,6 +357,12 @@ public class ListaProductos {
         return eliminar(cabeza.getProducto().getNombre());
     }
 
+    /**
+     * Elimina el último producto. Aunque tenemos la cola, igual hay que
+     * recorrer la lista para encontrar el nodo anterior a ella, así que es O(n).
+     *
+     * @return el producto eliminado, o null si la lista estaba vacía
+     */
     public Producto eliminarAlFinal() {
         if (estaVacia()) {
             return null;
@@ -249,19 +370,25 @@ public class ListaProductos {
         return eliminar(cola.getProducto().getNombre());
     }
 
-    /** Elimina todos los productos de la lista. Complejidad O(1). */
+    /** Deja la lista vacía. Basta con soltar la cabeza y la cola. */
     public void vaciar() {
         cabeza = null;
         cola = null;
         tamanio = 0;
     }
 
-    // Recorrido y reportes
-    
+    // Recorridos y reportes
+
+    /** Imprime todos los productos de la lista, uno por línea. */
     public void imprimirLista() {
         System.out.println(toString());
     }
 
+    /**
+     * Suma el costo total (precio por cantidad) de todos los productos.
+     *
+     * @return el costo de toda la lista
+     */
     public double calcularCostoTotal() {
         double total = 0;
         for (NodoProducto actual = cabeza; actual != null; actual = actual.getSiguiente()) {
@@ -270,10 +397,31 @@ public class ListaProductos {
         return total;
     }
 
+    /**
+     * Suma las unidades de todos los productos, por ejemplo cuántos artículos
+     * lleva un carrito. Usamos long porque la suma de varios int muy grandes
+     * se podría pasar del límite de un int.
+     *
+     * @return el total de unidades
+     */
+    public long calcularTotalUnidades() {
+        long total = 0;
+        for (NodoProducto actual = cabeza; actual != null; actual = actual.getSiguiente()) {
+            total += actual.getProducto().getCantidad();
+        }
+        return total;
+    }
+
+    /**
+     * Arma una tabla con cada producto, su precio, su cantidad y su costo
+     * total, y al final una fila con el total acumulado. Esta misma tabla es
+     * la que sale en la factura del cliente.
+     *
+     * @return la tabla lista para imprimir
+     */
     public String generarReporteCostos() {
-        final String formatoFila = "| %-3s | %-24s | %-14s | %15s | %8s | %17s |%n";
-        final String separador = "+-----+--------------------------+----------------+-----------------+----------+-------------------+"
-                + System.lineSeparator();
+        final String formatoFila = "| %-3s | %-26s | %-16s | %15s | %8s | %17s |%n";
+        final String separador = Formato.separador(3, 26, 16, 15, 8, 17);
 
         StringBuilder sb = new StringBuilder();
         sb.append(separador);
@@ -281,18 +429,19 @@ public class ListaProductos {
         sb.append(separador);
 
         if (estaVacia()) {
-            sb.append(String.format("| %-95s |%n", "La lista no contiene productos."));
+            sb.append(String.format("| %-" + (separador.trim().length() - 4) + "s |%n",
+                    "La lista no contiene productos."));
         } else {
             int posicion = 1;
-            int totalUnidades = 0;
+            long totalUnidades = 0;
             double costoAcumulado = 0;
             for (NodoProducto actual = cabeza; actual != null; actual = actual.getSiguiente()) {
                 Producto p = actual.getProducto();
                 double costoProducto = p.calcularCostoTotal();
                 sb.append(String.format(formatoFila,
                         posicion++,
-                        recortar(p.getNombre(), 24),
-                        recortar(p.getCategoria(), 14),
+                        recortar(p.getNombre(), 26),
+                        recortar(p.getCategoria(), 16),
                         Producto.formatearMonto(p.getPrecio()),
                         p.getCantidad(),
                         Producto.formatearMonto(costoProducto)));
@@ -307,17 +456,13 @@ public class ListaProductos {
         return sb.toString();
     }
 
-    /**
-     * Recorre la lista e imprime en consola el reporte de costos totales de
-     * cada producto (según su cantidad) y el costo total acumulado de la
-     * lista completa.
-     */
+    /** Imprime la tabla de costos en la consola. */
     public void imprimirReporteCostos() {
         System.out.print(generarReporteCostos());
     }
 
     /**
-     * @return representación de la lista con un producto por línea
+     * @return los productos numerados, uno por línea
      */
     @Override
     public String toString() {
@@ -333,8 +478,9 @@ public class ListaProductos {
         return sb.toString();
     }
 
-    // Métodos auxiliares privados
-    
+    // Métodos de apoyo (privados)
+
+    /** Recorre la lista desde la cabeza hasta encontrar el nodo con ese nombre. */
     private NodoProducto buscarNodo(String nombre) {
         if (nombre == null) {
             return null;
@@ -347,6 +493,7 @@ public class ListaProductos {
         return null;
     }
 
+    /** Avanza desde la cabeza tantas veces como diga la posición. Quien lo llama ya validó la posición. */
     private NodoProducto obtenerNodo(int posicion) {
         NodoProducto actual = cabeza;
         for (int i = 0; i < posicion; i++) {
@@ -355,10 +502,7 @@ public class ListaProductos {
         return actual;
     }
 
-    /**
-     * Verifica que un producto se pueda insertar: no debe ser nulo ni repetir
-     * el nombre de otro producto ya existente en la lista.
-     */
+    /** Antes de insertar revisamos que el producto no sea null y que su nombre no esté repetido. */
     private void validarProductoNuevo(Producto producto) {
         if (producto == null) {
             throw new IllegalArgumentException("No se puede insertar un producto nulo.");
@@ -370,6 +514,6 @@ public class ListaProductos {
     }
 
     private static String recortar(String texto, int maximo) {
-        return texto.length() <= maximo ? texto : texto.substring(0, maximo - 1) + "…";
+        return Formato.recortar(texto, maximo);
     }
 }
